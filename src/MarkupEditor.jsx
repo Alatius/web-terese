@@ -1,5 +1,4 @@
-import React, { useState, useEffect }  from 'react';
-import './App.css';
+import React, { useState, useEffect, useRef }  from 'react';
 import { Editor, EditorState, RichUtils } from 'draft-js';
 import 'draft-js/dist/Draft.css';
 import { stateToHTML } from 'draft-js-export-html';
@@ -47,7 +46,7 @@ function StyleButton({ label, style, onToggle }) {
   );
 }
 
-function MyEditor() {
+function MarkupEditor() {
   const [editorState, setEditorState] = useState(
     () => EditorState.createEmpty(),
   );
@@ -81,12 +80,4 @@ function MyEditor() {
   );
 }
 
-function App() {
-  return (
-    <div className="App">
-      <MyEditor />
-    </div>
-  );
-}
-
-export default App;
+export default MarkupEditor;
