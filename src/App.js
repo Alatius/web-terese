@@ -1,14 +1,23 @@
-import React, { useState, useRef }  from 'react';
+import React, { useState, useEffect }  from 'react';
 import './App.css';
 import { Editor, EditorState, RichUtils } from 'draft-js';
 import 'draft-js/dist/Draft.css';
+import { stateToHTML } from 'draft-js-export-html';
 
 const styleMap = {
+  'BOLD': {
+    fontWeight: 'bold',
+    backgroundColor: 'yellow',
+  },
+  'ITALIC': {
+    fontStyle: 'italic',
+    backgroundColor: 'lightgreen',
+  },
   'SPACED': {
     color: 'red',
   },
   'FRAKTUR': {
-    color: 'blue',
+    backgroundColor: 'lightblue',
   },
 };
 
@@ -18,6 +27,14 @@ const styleButtons = [
   {label: 'Spaced', style: 'SPACED'},
   {label: 'Fraktur', style: 'FRAKTUR'},
 ];
+
+const exportOptions = {
+  inlineStyles: {
+    BOLD: { element: 'b' },
+    SPACED: { element: 'sp' },
+    FRAKTUR: { element: 'fr' },
+  },
+};
 
 function StyleButton({ label, style, onToggle }) {
   return (
@@ -31,7 +48,6 @@ function StyleButton({ label, style, onToggle }) {
 }
 
 function MyEditor() {
-  const editorRef = useRef();
   const [editorState, setEditorState] = useState(
     () => EditorState.createEmpty(),
   );
@@ -39,6 +55,10 @@ function MyEditor() {
   const handleStyleToggle = (style) => {
     setEditorState(state => RichUtils.toggleInlineStyle(state, style));
   };
+
+  useEffect(() => {
+    console.log(stateToHTML(editorState.getCurrentContent(), exportOptions));
+  }, [editorState]);
 
   return (
     <div>
@@ -53,7 +73,6 @@ function MyEditor() {
         ))
       }
       <Editor
-        ref={editorRef}
         editorState={editorState}
         onChange={setEditorState}
         customStyleMap={styleMap}
