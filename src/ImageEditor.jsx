@@ -10,12 +10,18 @@ function blend(source1, xpos, ypos, width, height, source2, xdisp, ydisp, mode, 
   const targetData = target ? target.getContext('2d').getImageData(xdisp, ydisp, width, height) : srcData2;
   const len = srcData1.data.length;
   for (let px = 0; px < len; px += 4) {
-    const a = srcData1.data[px] + srcData1.data[px+1] + srcData1.data[px+2];
-    const b = srcData2.data[px] + srcData2.data[px+1] + srcData2.data[px+2];
-    const result = 255 - Math.abs(a-b) / 3;
-    targetData.data[px] = result;
-    targetData.data[px+1] = result;
-    targetData.data[px+2] = result;
+    const a = 1.0 - (srcData1.data[px] + srcData1.data[px+1] + srcData1.data[px+2]) / (3 * 255);
+    const b = 1.0 - (srcData2.data[px] + srcData2.data[px+1] + srcData2.data[px+2]) / (3 * 255);
+    if (mode === 'diff') {
+      targetData.data[px]   = 255 * (1.0 - 1.0*a*a - 1.0*b*b + 2.0*a*b);
+      targetData.data[px+1] = 255 * (1.0 - 1.0*a*a - 0.6*b*b + 1.6*a*b);
+      targetData.data[px+2] = 255 * (1.0 - 0.6*a*a - 1.0*b*b + 1.6*a*b);
+    } else if (mode === 'maxink') {
+      const result = 255 * (1.0 - Math.max(a, b));
+      targetData.data[px] = result;
+      targetData.data[px+1] = result;
+      targetData.data[px+2] = result;
+    }
     targetData.data[px+3] = 255;
   }
   (target ? target : source2).getContext('2d').putImageData(targetData, xdisp, ydisp);
@@ -67,7 +73,7 @@ function ImageEditor({ url }) {
         const fontbox = font[box.s][box.c];
         if (fontbox) {
           const {x, y, w, h} = fontbox;
-          blend(fontCanvas, x, y, w, h, typedCanvas, box.x, box.y, null);
+          blend(fontCanvas, x, y, w, h, typedCanvas, box.x, box.y, 'maxink');
         }
       }
 
@@ -75,7 +81,7 @@ function ImageEditor({ url }) {
       blendCanvas.width = width;
       blendCanvas.height = height;
 
-      blend(typedCanvas, 0, 0, width, height, pageCanvas, 0, 0, null, blendCanvas);
+      blend(typedCanvas, 0, 0, width, height, pageCanvas, 0, 0, 'diff', blendCanvas);
 
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, width, height);
