@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef }  from 'react';
+import React, { useState, useEffect, useRef, useCallback }  from 'react';
 import useImage from 'use-image';
 import boxes from './boxes.json';
 import font from './font.json';
@@ -48,18 +48,23 @@ function useImageCanvas(url) {
 const dpr = window.devicePixelRatio || 1;
 
 function ImageEditor({ url }) {
-  const canvasRef = useRef();
+  const backCanvasRef = useRef();
+  const frontCanvasRef = useRef();
   const pageCanvas = useImageCanvas(url);
   const fontCanvas = useImageCanvas('font.png');
   const [scaleFactor, setScaleFactor] = useState(0.5);
+  const [selectedBox, setSelectedBox] = useState(null);
+  const [draggingBox, setDraggingBox] = useState(null);
 
-  const handleClick = (event) => {
-    let rect = event.target.getBoundingClientRect(); 
-    let x = (event.clientX - rect.left) / scaleFactor; 
-    let y = (event.clientY - rect.top) / scaleFactor;
+
+  const coords = (event) => {
+    const rect = event.target.getBoundingClientRect(); 
+    const x = (event.clientX - rect.left) / scaleFactor; 
+    const y = (event.clientY - rect.top) / scaleFactor;
+    return {x, y};
   };
 
-  useEffect(() => {
+  const redrawCanvas = useCallback(() => {
     if (pageCanvas && fontCanvas) {
       const { width, height } = pageCanvas;
 
@@ -83,13 +88,73 @@ function ImageEditor({ url }) {
 
       blend(typedCanvas, 0, 0, width, height, pageCanvas, 0, 0, 'diff', blendCanvas);
 
-      const ctx = canvasRef.current.getContext('2d');
+      const ctx = backCanvasRef.current.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, width, height);
       ctx.scale(scaleFactor * dpr, scaleFactor * dpr);
       ctx.drawImage(blendCanvas, 0, 0);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
-  }, [pageCanvas, fontCanvas, scaleFactor]);
+  }, [fontCanvas, pageCanvas, scaleFactor]);
+
+  const handleMouseDown = (event) => {
+    const {x, y} = coords(event);
+    for (const box of boxes) {
+      const fontbox = font[box.s][box.c];
+      if (fontbox) {
+        if ( x >= box.x && x < box.x + fontbox.w &&
+             y >= box.y && y < box.y + fontbox.h )
+        {
+          if (selectedBox && box === selectedBox.box) {
+            setDraggingBox({ x, y, xdisp: x-box.x, ydisp: y-box.y });
+          } else {
+            setSelectedBox({ box, width: fontbox.w, height: fontbox.h });            
+          }
+          return;
+        }
+      }
+    }
+    setDraggingBox(null);
+    setSelectedBox(null);
+  };
+
+  const handleMouseMove = (event) => {
+    if (draggingBox) {
+      if (event.buttons === 0) {
+        setDraggingBox(null);        
+      } else {
+        const {x, y} = coords(event);
+        setDraggingBox({ ...draggingBox, x, y });
+      }
+    }
+  };
+
+  const handleMouseUp = (event) => {
+    if (draggingBox) {
+      const {x, y} = coords(event);
+      selectedBox.box.x = x - draggingBox.xdisp;
+      selectedBox.box.y = y - draggingBox.ydisp;
+      redrawCanvas();
+      setDraggingBox(null);
+    }
+  };
+
+  useEffect(() => {
+    redrawCanvas();
+  }, [redrawCanvas, pageCanvas, fontCanvas, scaleFactor]);
+
+  useEffect(() => {
+    const ctx = frontCanvasRef.current.getContext('2d');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, frontCanvasRef.current.width, frontCanvasRef.current.height);
+    ctx.scale(scaleFactor * dpr, scaleFactor * dpr);
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2 / scaleFactor;
+    if (draggingBox) {
+      ctx.strokeRect(draggingBox.x - draggingBox.xdisp, draggingBox.y - draggingBox.ydisp, selectedBox.width, selectedBox.height);
+    } else if (selectedBox) {
+      ctx.strokeRect(selectedBox.box.x, selectedBox.box.y, selectedBox.width, selectedBox.height);
+    }
+  }, [scaleFactor, selectedBox, draggingBox]);
 
   const scaledWidth = pageCanvas ? pageCanvas.width * scaleFactor : 0;
   const scaledHeight = pageCanvas ? pageCanvas.height * scaleFactor : 0;
@@ -108,11 +173,19 @@ function ImageEditor({ url }) {
       }
       <div className="CanvasContainer">
         <canvas
-          ref={canvasRef}
+          ref={backCanvasRef}
           style={{ width: scaledWidth, height: scaledHeight }}
           width={scaledWidth * dpr}
           height={scaledHeight * dpr}
-          onClick={handleClick}
+        />
+        <canvas
+          ref={frontCanvasRef}
+          style={{ width: scaledWidth, height: scaledHeight }}
+          width={scaledWidth * dpr}
+          height={scaledHeight * dpr}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
         />
       </div>
     </div>
